@@ -84,10 +84,9 @@ class BibleCrawler:
         full_text = soup.get_text()
         
         # Find the chapter heading to locate where verses start
-        # Pattern: "제 N 장" (Chapter N) or "제 N 편" (for Psalms)
-        # Pattern: "제 N 장" (Chapter N) or "제 N 편" (Psalm N) or "Chapter N" (English)
-        chapter_pattern = rf'(?:제\s*{chapter}\s*[장편]|Chapter\s*{chapter})'
-        chapter_match = re.search(chapter_pattern, full_text, re.IGNORECASE)
+        # Pattern: "제 N 장" (Chapter N) or "제 N 편" (Psalm N)
+        chapter_pattern = rf'제\s*{chapter}\s*[장편]'
+        chapter_match = re.search(chapter_pattern, full_text)
         
         if not chapter_match:
             logging.warning(f"Could not find chapter {chapter} heading for {book_abbr}")
@@ -97,13 +96,13 @@ class BibleCrawler:
         text_after_chapter = full_text[chapter_match.end():]
         
         # Find verse pattern: number followed by Korean text
-        # Pattern: digit(s) followed by spaces and ANY character (Korean or English)
-        # We need to match: "1   태초에..." or "1 In..."
+        # Pattern: digit(s) followed by spaces and Korean characters
+        # We need to match: "1   태초에 하나님이..." "2   땅이..."
+        # But stop at footnote markers like "1)" or before next chapter/section
         
         # Split by verse numbers (look ahead to preserve the number)
-        # Match: one or more digits followed by whitespace and a non-whitespace char
-        # Captured groups: (VerseNum) (FirstChar)
-        verse_pattern = r'(\d+)\s+([^\s])'
+        # Match: one or more digits followed by whitespace and Korean text
+        verse_pattern = r'(\d+)\s+([가-힣])'
         
         verses_raw = re.split(verse_pattern, text_after_chapter)
         
@@ -120,20 +119,17 @@ class BibleCrawler:
                 verse_text = first_char + verse_text_part
                 
                 # Clean up the text
-                # Remove footnote markers like "1)", "2)" etc or "a)", "b)"
+                # Remove footnote markers like "1)", "2)" etc
                 verse_text = re.sub(r'\d+\)', '', verse_text)
-                verse_text = re.sub(r'[a-z]\)', '', verse_text) # Simple check for English footnotes like a)
                 
                 # Remove extra whitespace
                 verse_text = ' '.join(verse_text.split())
                 # Stop at certain markers (next section, etc)
                 # Take only until we hit certain patterns
                 stop_patterns = [
-                    r'제\s*\d+\s*[장편]',      # Next chapter/psalm (Korean)
-                    r'Chapter\s*\d+',       # Next chapter (English)
+                    r'제\s*\d+\s*[장편]',      # Next chapter/psalm
                     r'성경\s*단어',          # Bible word search
-                    r'[A-Z]{2,}\s+(?:[A-Z][a-z]+)', # Section headers often All Caps or Title Case in English?
-                    # Note: English section headers are harder to detect purely by regex without context
+                    r'[A-Z]{2,}',           # All caps (likely section headers)
                 ]
                 for pattern in stop_patterns:
                     match = re.search(pattern, verse_text)

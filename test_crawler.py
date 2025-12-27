@@ -44,28 +44,6 @@ class TestBibleCrawler(unittest.TestCase):
         print(f"Fetched {len(chapter_data)} verses.")
         print(f"Sample: 시1:1 -> {chapter_data.get('시1:1')}")
 
-    def test_fetch_cev_genesis_1(self):
-        print("\nTesting: Fetch CEV Genesis Chapter 1...")
-        import crawler as crawler_module
-        original_version = crawler_module.VERSION
-        crawler_module.VERSION = "CEV"
-        
-        try:
-            # Re-init crawler to be safe (though session is reused)
-            local_crawler = BibleCrawler()
-            chapter_data = local_crawler.fetch_chapter("창", 1)
-            
-            self.assertTrue(len(chapter_data) > 0, "Should return verses for CEV")
-            self.assertIn("창1:1", chapter_data, "Should contain Genesis 1:1")
-            print(f"Fetched {len(chapter_data)} verses.")
-            first_verse = chapter_data.get('창1:1')
-            print(f"Sample: 창1:1 -> {first_verse}")
-            
-            # Verify English text
-            self.assertTrue(first_verse.strip()[0].isalpha(), "First char should be alphabet (In...)")
-        finally:
-            crawler_module.VERSION = original_version
-
     def tearDown(self):
         # Cleanup test file
         if os.path.exists(self.test_output):
