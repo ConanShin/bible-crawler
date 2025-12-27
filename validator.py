@@ -48,7 +48,8 @@ class BibleValidator:
         for key in self.data.keys():
             # Extract book abbr (this is a bit tricky without a delimiter, 
             # but our abbrs are English letters and chapters are numbers)
-            match = re.match(r'^([A-Za-z]+)([0-9]+):([0-9]+)$', key)
+            # Updated to support Korean chars (e.g. 창1:1)
+            match = re.match(r'^([가-힣A-Za-z]+)([0-9]+):([0-9]+)$', key)
             if match:
                 abbr = match.group(1)
                 # chapter = int(match.group(2))

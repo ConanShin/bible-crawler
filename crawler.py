@@ -85,12 +85,19 @@ class BibleCrawler:
         
         # Find the chapter heading to locate where verses start
         # Pattern: "제 N 장" (Chapter N) or "제 N 편" (Psalm N)
+        # For 1-chapter books, the header "제 1 장" is often missing.
         chapter_pattern = rf'제\s*{chapter}\s*[장편]'
         chapter_match = re.search(chapter_pattern, full_text)
         
         if not chapter_match:
-            logging.warning(f"Could not find chapter {chapter} heading for {book_abbr}")
-            return {}
+            # Fallback for 1-chapter books: BookName + Chapter
+            book_name = BOOKS[book_abbr]['name']
+            fallback_pattern = rf'{book_name}\s*{chapter}'
+            chapter_match = re.search(fallback_pattern, full_text)
+            
+            if not chapter_match:
+                logging.warning(f"Could not find chapter {chapter} heading for {book_abbr}")
+                return {}
         
         # Extract text after the chapter heading
         text_after_chapter = full_text[chapter_match.end():]
