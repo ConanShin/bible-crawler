@@ -4,40 +4,42 @@ import os
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 from tqdm import tqdm
 import re
 import argparse
 
-# Configuration (Merging some from existing config.py logic)
+# Configuration
 API_BASE_URL = "https://goodtvbible.goodtv.co.kr/api/onlinebible/bibleread/read-all"
 OUTPUT_DIR = "output"
 LOG_DIR = "logs"
-LOG_FILE = os.path.join(LOG_DIR, "ko_crawler.log")
+LOG_FILE = os.path.join(LOG_DIR, "goodtv_crawler.log")
 
 # Version Mapping
-# 0: 개역개정 (krv), 20: 새번역 (snkv), 3: 표준새번역 (ncv), 1: 개역한글 (ksv), 2: 공동번역 (kcb)
+# Korean: 0: krv, 20: snkv, 3: ncv, 1: ksv, 2: kcb
+# English: 6: kjv, 13: nasb, 5: niv, 14: esv
 VERSIONS = {
-    "krv": "0",
-    "snkv": "20",
-    "ncv": "3",
-    "ksv": "1",
-    "kcb": "2"
+    "krv": {"id": "0", "lang": "ko"},
+    "snkv": {"id": "20", "lang": "ko"},
+    "ncv": {"id": "3", "lang": "ko"},
+    "ksv": {"id": "1", "lang": "ko"},
+    "kcb": {"id": "2", "lang": "ko"},
+    "kjv": {"id": "6", "lang": "en"},
+    "nasb": {"id": "13", "lang": "en"},
+    "niv": {"id": "5", "lang": "en"},
+    "esv": {"id": "14", "lang": "en"}
 }
 
 # Book Abbreviation Mapping (for fallbacks if API doesn't return bookname_abb)
 BOOK_ABBR_MAP = {
     "누": "눅",
     "계": "계",
-    # Most match, but we can add more if needed
 }
 
-# Book metadata structure (simplified from books_data.py for internal use if needed)
-# But we can import from existing books_data.py
+# Import standard book metadata
 try:
     from books_data import BOOKS, BOOK_ORDER
 except ImportError:
-    # Fallback if not in the same dir
     BOOKS = {} 
     BOOK_ORDER = []
 
@@ -49,13 +51,14 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-class KoBibleCrawler:
-    def __init__(self, version_name: str, version_id: str):
+class GoodTVBibleCrawler:
+    def __init__(self, version_name: str, version_id: str, lang: str):
         self.version_name = version_name
         self.version_id = version_id
+        self.lang = lang
         self.results: Dict[str, str] = {}
         self.session = requests.Session()
-        self.output_file = os.path.join(OUTPUT_DIR, f"bible_{version_name}_ko.json")
+        self.output_file = os.path.join(OUTPUT_DIR, f"bible_{version_name}_{lang}.json")
         
     def clean_text(self, text: str) -> str:
         if not text:
@@ -64,7 +67,7 @@ class KoBibleCrawler:
         text = text.replace("○", "")
         return " ".join(text.split()).strip()
 
-    def fetch_chapter(self, bible_code: int, chapter: int) -> List[Dict[str, Any]]:
+    def fetch_chapter(self, bible_code: int, chapter: int) -> Tuple[List[Dict[str, Any]], str]:
         params = {
             'version1': self.version_id,
             'version2': '',
@@ -73,7 +76,7 @@ class KoBibleCrawler:
             'jang': chapter
         }
         try:
-            response = self.session.get(API_BASE_URL, params=params, timeout=10)
+            response = self.session.get(API_BASE_URL, params=params, timeout=15)
             response.raise_for_status()
             data = response.json()
             # The structure is data.data.version1.content
@@ -114,6 +117,8 @@ class KoBibleCrawler:
                             text = item.get("text")
                             if jul is not None and text:
                                 cleaned_text = self.clean_text(text)
+                                # The requirement is bookname_abb + jang + ":" + jul
+                                # For English versions, API still returns "창", "출" etc.
                                 key = f"{bookname_abb}{ch}:{jul}"
                                 temp_results[(bc, ch, jul)] = (key, cleaned_text)
                     except Exception as e:
@@ -134,42 +139,69 @@ class KoBibleCrawler:
             json.dump(self.results, f, ensure_ascii=False, indent=2)
         print(f"Saved {self.version_name} to {self.output_file}")
 
-def crawl_version(v_name, v_id):
-    crawler = KoBibleCrawler(v_name, v_id)
+def crawl_version(v_name):
+    v_info = VERSIONS[v_name]
+    crawler = GoodTVBibleCrawler(v_name, v_info["id"], v_info["lang"])
     crawler.crawl()
     return v_name, len(crawler.results)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", help="Specific version to crawl (krv, snkv, etc.)")
+    parser.add_argument("--version", help="Specific version to crawl (krv, kjv, etc.)")
+    parser.add_argument("--all", action="store_true", help="Crawl all versions")
+    parser.add_argument("--lang", help="Crawl all versions of a specific language (ko, en)")
     args = parser.parse_args()
 
+    target_versions = []
     if args.version:
         if args.version in VERSIONS:
-            crawl_version(args.version, VERSIONS[args.version])
+            target_versions.append(args.version)
         else:
             print(f"Unknown version: {args.version}")
+            return
+    elif args.lang:
+        target_versions = [name for name, info in VERSIONS.items() if info["lang"] == args.lang]
+    elif args.all:
+        target_versions = list(VERSIONS.keys())
     else:
-        # Parallel crawl all versions
-        results = []
-        with ThreadPoolExecutor(max_workers=len(VERSIONS)) as executor:
-            future_to_v = {executor.submit(crawl_version, name, vid): name for name, vid in VERSIONS.items()}
-            for future in as_completed(future_to_v):
+        print("Please specify --version, --lang, or --all")
+        return
+
+    if not target_versions:
+        print("No versions to crawl.")
+        return
+
+    # Parallel crawl target versions
+    results = []
+    # Use fewer workers for versions to avoid overwhelming the server
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_v = {executor.submit(crawl_version, name): name for name in target_versions}
+        for future in as_completed(future_to_v):
+            try:
                 v_name, count = future.result()
                 results.append((v_name, count))
-        
-        print("\nCrawl Summary:")
-        for v_name, count in results:
-            print(f"- {v_name}: {count} verses")
-        
-        # Verify counts
-        counts = [r[1] for r in results]
+            except Exception as e:
+                print(f"Error crawling {future_to_v[future]}: {e}")
+    
+    print("\nCrawl Summary:")
+    for v_name, count in results:
+        print(f"- {v_name}: {count} verses")
+    
+    # Verify counts within same language
+    lang_results = {}
+    for v_name, count in results:
+        lang = VERSIONS[v_name]["lang"]
+        if lang not in lang_results: lang_results[lang] = []
+        lang_results[lang].append(count)
+    
+    for lang, counts in lang_results.items():
         if len(set(counts)) == 1:
-            print("\n✅ All versions have the same number of verses.")
+            print(f"\n✅ All {lang} versions have the same number of verses ({counts[0]}).")
         else:
-            print("\n⚠️ Warning: Verse counts differ between versions!")
+            print(f"\n⚠️ Warning: Verse counts differ between {lang} versions!")
             for v_name, count in results:
-                print(f"  {v_name}: {count}")
+                if VERSIONS[v_name]["lang"] == lang:
+                    print(f"  {v_name}: {count}")
 
 if __name__ == "__main__":
     main()
