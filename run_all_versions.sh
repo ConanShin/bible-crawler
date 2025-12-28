@@ -1,33 +1,10 @@
 #!/bin/bash
 
-# Activate virtual environment
-source venv/bin/activate
+echo "🚀 Starting full batch crawl (KO + EN)..."
 
-# List of versions to crawl
-VERSIONS=("GAE" "HAN" "SAE" "SAENEW" "COG" "COGNEW")
+chmod +x run_ko_versions.sh run_en_versions.sh
 
-echo "🚀 Starting batch crawl for all versions..."
+./run_ko_versions.sh
+./run_en_versions.sh
 
-for ver in "${VERSIONS[@]}"; do
-    echo "----------------------------------------"
-    echo "📖 Crawling Version: $ver"
-    echo "----------------------------------------"
-    
-    # Run crawler with specific version
-    export BIBLE_VERSION=$ver
-    python3 main.py --crawl
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ Finished $ver"
-    else
-        echo "❌ Failed $ver"
-    fi
-    
-    # Optional: Validate result
-    # python3 main.py --validate
-    
-    # Sleep briefly between versions
-    sleep 2
-done
-
-echo "🎉 All versions processed."
+echo "🎉 All language versions processed."

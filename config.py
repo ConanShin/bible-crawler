@@ -14,6 +14,24 @@ VERSION_FILES = {
     "SAENEW": "bible_ncv.json",  # 표준새번역
     "COG": "bible_kcb.json",     # 공동번역
     "COGNEW": "bible_kcb2.json", # 공동번역 개정판
+    # English Versions (Bible.com)
+    "NIV": "bible_niv_en.json",
+    "ESV": "bible_esv_en.json",
+    "NKJV": "bible_nkjv_en.json",
+    "NLT": "bible_nlt_en.json",
+    "NASB": "bible_nasb_en.json",
+    "KJV": "bible_kjv_en.json",
+}
+
+# Bible.com specific settings
+BIBLE_COM_BASE_URL = "https://www.bible.com/bible"
+BIBLE_COM_VERSION_IDS = {
+    "NIV": "111",
+    "ESV": "59",
+    "NKJV": "114",
+    "NLT": "116",
+    "NASB": "2692",
+    "KJV": "1",
 }
 
 # Version code (Default: 개역개정 GAE)

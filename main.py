@@ -2,7 +2,9 @@ import argparse
 import sys
 import logging
 from crawler import BibleCrawler
+from bible_com_crawler import BibleComCrawler
 from validator import BibleValidator
+from config import VERSION, BIBLE_COM_VERSION_IDS
 
 def main():
     parser = argparse.ArgumentParser(description="Bible Crawler & Validator")
@@ -18,8 +20,14 @@ def main():
         return
 
     if args.crawl or args.full:
-        print("🚀 Starting Crawler...")
-        crawler = BibleCrawler()
+        print(f"🚀 Starting Crawler for version: {VERSION}...")
+        
+        # Select crawler based on version
+        if VERSION in BIBLE_COM_VERSION_IDS:
+            crawler = BibleComCrawler()
+        else:
+            crawler = BibleCrawler()
+            
         try:
             crawler.crawl_all()
             print("✅ Crawling finished.")

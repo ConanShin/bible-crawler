@@ -47,15 +47,30 @@ BIBLE_VERSION=HAN python3 main.py --crawl
 | `SAENEW` | 표준새번역 | `bible_ncv.json` |
 | `COG` | 공동번역 | `bible_kcb.json` |
 | `COGNEW` | 공동번역 개정 | `bible_kcb2.json` |
+| `NIV` | New International Version | `bible_niv_en.json` |
+| `ESV` | English Standard Version | `bible_esv_en.json` |
+| `NKJV` | New King James Version | `bible_nkjv_en.json` |
+| `NLT` | New Living Translation | `bible_nlt_en.json` |
+| `NASB` | NASB2020 | `bible_nasb_en.json` |
+| `KJV` | King James Version | `bible_kjv_en.json` |
 
-### 2. 전체 버전 일괄 크롤링 (Batch Mode)
-지원되는 모든 역본을 순차적으로 크롤링하려면 아래 스크립트를 실행하세요:
+### 2. 일괄 크롤링 (Batch Mode)
 
-```bash
-./run_all_versions.sh
-# 로그를 파일로 저장하려면:
-# ./run_all_versions.sh > logs/batch_run.log 2>&1
-```
+- **전체 버전 크롤링 (KO + EN):**
+  ```bash
+  chmod +x run_all_versions.sh run_ko_versions.sh run_en_versions.sh
+  ./run_all_versions.sh
+  ```
+
+- **한국어 버전만 크롤링:**
+  ```bash
+  ./run_ko_versions.sh
+  ```
+
+- **영어 버전만 크롤링:**
+  ```bash
+  ./run_en_versions.sh
+  ```
 
 ### 3. 데이터 검증 (Validation)
 수집된 데이터의 무결성(JSON 구조, 누락된 구절 확인 등)을 검사합니다:
